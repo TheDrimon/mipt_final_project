@@ -25,7 +25,7 @@ def field_init(w_type="cylinder"):
     global wall, rho0, tau
 
     rho0 = 10  # average density
-    tau = 1  # collision timescale
+    tau = 0.6  # collision timescale
 
     F = np.ones((Ny, Nx, NL)) * rho0 / NL  # поле жидкости
 
@@ -66,21 +66,21 @@ def init():
     pg.init()
 
     screen = pg.display.set_mode((Wi, He + b))
-    
-	# карта интерфейса
+
+    # карта интерфейса
     Buttons = [GUI.Button(screen, 0, He, b*2, b,
                           "reset"),
                GUI.Switch(screen, b*4.2, He, b*2, b,
                           ["draw", "select", "del"]),
                GUI.Switch(screen, b*2.1, He, b*2, b,
-                        ["play", "pause"]),
+                          ["play", "pause"]),
                GUI.Switch(screen, b*6.3, He, b*4, b,
                           ["none", "cylinder", "rectangle"]),
                GUI.Switch(screen, b*10.4, He, b*2, b,
                           ["rot", "rho"])]
     display = GUI.Display(screen, 0, 0, Wi, He)
 
-    field_init()# MODEL init
+    field_init()  # MODEL init
 
 
 def step_calc():
@@ -203,7 +203,7 @@ def main():
 
         draw()
 
-        clock.tick(60)
+        clock.tick(600)
 
         for event in pg.event.get():  # события
             if event.type == pg.QUIT:

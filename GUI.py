@@ -28,6 +28,7 @@ class Display(GUI_window):  # класс экрана
         super().__init__(screen, Px, Py, Sx, Sy)
         self.F = F  # поле жидкости
         self.Walls = Walls
+        self.dat = np.ones((2, 1, 1))
 
     def update(self, F, cylinder):
         self.F = F
@@ -50,26 +51,8 @@ class Display(GUI_window):  # класс экрана
             pygame.surfarray.make_surface(W), self.size), self.pos)
 
     def get(self, x, y):  # получение точки
-        rho = np.sum(self.F, 2)
-        ux = np.sum(self.F*cxs, 2) / rho
-        uy = np.sum(self.F*cys, 2) / rho
-        ux[self.Walls] = 0
-        uy[self.Walls] = 0
-        vorticity = (np.roll(ux, -1, axis=0) - np.roll(ux, 1, axis=0)) - \
-            (np.roll(uy, -1, axis=1) - np.roll(uy, 1, axis=1))
 
-        m = np.mean(vorticity)
-        mm = np.min(vorticity)
-
-        K = 255*((m - vorticity)/(mm+1e-14))
-
-        W = np.zeros((len(K), len(K[0]), 3))
-        W[:, :, 2] = 50
-        W[:, :, 0][K < 0] -= K[K < 0]
-        W[:, :, 1][K > 0] += K[K > 0]
-        W[self.Walls] = (0, 0, 0)
-
-        return W[x, y], rho[x, y]
+        return self.dat[0][x, y], self.dat[1][x, y]
 
     def draw(self):  # отрисовка
         rho = np.sum(self.F, 2)
@@ -83,13 +66,15 @@ class Display(GUI_window):  # класс экрана
         m = np.mean(vorticity)
         mm = np.min(vorticity)
 
-        K = 255*((m - vorticity)/(mm+1e-14))
+        K = 255 * ((m - vorticity) / (mm + 1e-14))
 
         W = np.zeros((len(K), len(K[0]), 3))
         W[:, :, 2] = 50
-        W[:, :, 0][K < 0] -= K[K < 0]
-        W[:, :, 1][K > 0] += K[K > 0]
+        W[:, :, 0][K < 0] = -K[K < 0]
+        W[:, :, 1][K > 0] = K[K > 0]
         W[self.Walls] = (0, 0, 0)
+
+        self.dat = [W, rho]
 
         self._screen.blit(pygame.transform.scale(
             pygame.surfarray.make_surface(W), self.size), self.pos)
@@ -150,5 +135,5 @@ class Switch(GUI_window):  # переключатели
     def press(self, pressed):  # событие
         if self.pressed and not pressed:
             self.state = (self.state + 1) % len(self.text)
-            
+
         self.pressed = pressed
