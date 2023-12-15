@@ -36,7 +36,7 @@ class Display(GUI_window):  # класс экрана
     def simple_draw(self):
         m = 2  # np.mean(np.sum(self.F[:,:,:3], 2))
         mm = 3  # np.min(np.sum(self.F[:,:,:3], 2))
-        # W = self.F[:,:,:3] * 0
+        # W = self.F[:,:,:3] * 0 для доработки
         K = 255*((m - np.sum(self.F[:, :, :3], 2))/(mm+1e-14))
 
         W = np.zeros((len(K), len(K[0]), 3))
@@ -130,7 +130,6 @@ class Switch(GUI_window):  # переключатели
         super().__init__(screen, Px, Py, Sx, Sy)
         self.pressed = 0
         self.state = 0
-        self.active = 0
         self.text = text
 
     def draw(self):  # визуализация состояния переключателя
@@ -151,8 +150,5 @@ class Switch(GUI_window):  # переключатели
     def press(self, pressed):  # событие
         if self.pressed and not pressed:
             self.state = (self.state + 1) % len(self.text)
-            self.active = 1
-        else:
-            self.active = 0
-
+            
         self.pressed = pressed

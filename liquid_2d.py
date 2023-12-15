@@ -57,11 +57,8 @@ def field_init(w_type="cylinder"):
 def init():
     # GUI init <--
     global N, screen, Wi, He, b
-    global mode, play
     global Buttons, display
 
-    play = 0  # 0 | 1
-    mode = "draw"  # draw | select | del
     Wi, He = 1080, 360
     N = 324  # Wi liquid resolition
     b = 30  # отступ меню
@@ -69,21 +66,21 @@ def init():
     pg.init()
 
     screen = pg.display.set_mode((Wi, He + b))
-
-    Buttons = [GUI.Button(screen, 0, He, b*2, b, "reset"),
+    
+	# карта интерфейса
+    Buttons = [GUI.Button(screen, 0, He, b*2, b,
+                          "reset"),
                GUI.Switch(screen, b*4.2, He, b*2, b,
                           ["draw", "select", "del"]),
-               GUI.Switch(screen, b*2.1, He, b*2, b, ["play", "pause"]),
+               GUI.Switch(screen, b*2.1, He, b*2, b,
+                        ["play", "pause"]),
                GUI.Switch(screen, b*6.3, He, b*4, b,
                           ["none", "cylinder", "rectangle"]),
-               GUI.Switch(screen, b*10.4, He, b*2, b, ["rot", "rho"])]
+               GUI.Switch(screen, b*10.4, He, b*2, b,
+                          ["rot", "rho"])]
     display = GUI.Display(screen, 0, 0, Wi, He)
 
-    # MODEL init <--
-    global w_type, d_type
-    d_type = ""
-    w_type = "cylinder"
-    field_init()
+    field_init()# MODEL init
 
 
 def step_calc():
@@ -119,14 +116,14 @@ def step_calc():
 
 
 def interract(press, pos):
-    global mode, Buttons, play, w_type, d_type
+    global Buttons
     global wall
 
     x, y = pos[:2]  # координаты косания
     if 0 < x < Wi:
         if 0 < y < He:
             # работа с полем
-
+            mode = Buttons[1].text[Buttons[1].state]
             if mode == "draw":
                 wall[x * N//Wi, y * N//Wi] = True
 
@@ -146,27 +143,8 @@ def interract(press, pos):
 
     # реакции кнопок
     if Buttons[0].active:
-        field_init(w_type)
+        field_init(Buttons[3].text[Buttons[3].state])
         Buttons[0].active = 0
-
-    if Buttons[1].active:
-        mode = Buttons[1].text[Buttons[1].state]
-
-        Buttons[1].active = 0
-
-    if Buttons[2].active:
-        play = Buttons[2].state
-
-        Buttons[2].active = 0
-
-    if Buttons[3].active:
-        w_type = Buttons[3].text[Buttons[3].state]
-
-        Buttons[3].active = 0
-    if Buttons[4].active:
-        d_type = Buttons[4].text[Buttons[4].state]
-
-        Buttons[4].active = 0
 
 
 def swipe(pos, prs):
@@ -184,6 +162,8 @@ def swipe(pos, prs):
         if 0 < y < He:
             # работа с полем
             pg.display.set_caption(str((x, y)))
+            mode = Buttons[1].text[Buttons[1].state]
+
             if mode == "draw":
                 wall[x * N//Wi, y * N//Wi] = True
 
@@ -199,7 +179,7 @@ def swipe(pos, prs):
 def draw():
     screen.fill((0, 0, 0))
 
-    if d_type == "rho":
+    if Buttons[4].text[Buttons[4].state] == "rho":
         display.simple_draw()  # отрисовка по плотности
     else:
         display.draw()  # отрисовка по скорости кручения
@@ -218,7 +198,7 @@ def main():
     prs = (-1, -1)
 
     while RUN:
-        if play:
+        if Buttons[2].state:
             step_calc()
 
         draw()
