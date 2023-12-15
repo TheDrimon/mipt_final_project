@@ -114,22 +114,22 @@ class Switch(GUI_window):
         self.pressed = 0
         self.state = 0
         self.active = 0
-        self._text = text
+        self.text = text
         
     def draw(self):
          pygame.draw.rect(self._screen,col[self.pressed],(self.pos,self.size),2)
 
-         if self._text[self.state] != '':
-            M = int(1.9*self.size[0]//(1.4+len(self._text[self.state])**0.7))# общая функция выравнивания размера текста
+         if self.text[self.state] != '':
+            M = int(min(1.9*self.size[0]//(1.4+len(self.text[self.state])**0.7),self.size[1]))# общая функция выравнивания размера текста
             T_pose = (self.pos[0]+5,self.pos[1]-5)
-            self._screen.blit(pygame.font.SysFont('arial', M).render(self._text[self.state], False, (250,250,250)),T_pose)
+            self._screen.blit(pygame.font.SysFont('arial', M).render(self.text[self.state], False, (250,250,250)),T_pose)
 
     def reset(self):
          self.pressed = 0
     
     def press(self,pressed):
          if self.pressed and not pressed:
-             self.state = (self.state + 1) % len(self._text)
+             self.state = (self.state + 1) % len(self.text)
              self.active = 1
          else:
              self.active = 0

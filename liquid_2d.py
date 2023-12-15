@@ -2,7 +2,7 @@ import pygame as pg
 import numpy as np
 import GUI
 
-def Field_init():
+def Field_init(Type = "cylinder"):
     global NL, idxs, cxs, cys, weights
     global F
     NL = 9
@@ -21,7 +21,7 @@ def Field_init():
     Nx, Ny = N*He//Wi, N
 
     # Начальные условия
-    global cylinder, rho0, tau
+    global wall, rho0, tau
 	            
     rho0 = 10 # average density
     tau = 1 # collision timescale
@@ -39,12 +39,20 @@ def Field_init():
     rho = np.sum(F,2)
     for i in idxs:
         F[:,:,i] *= rho0 / rho
+	
 
-
-    cylinder = (X - Nx/2)**2 + (Y - Ny/4)**2 < (Nx/4)**2 # Cylinder boundary
+    # wall boundary
+    wall = np.zeros((Ny,Nx), dtype = np.bool_)
+    if Type == "none":
+    	pass#wall = np.zeros((Nx,Ny), dtype = np.bool_)
+    if Type == "cylinder":
+    	wall = (X - Nx/2)**2 + (Y - Ny/4)**2 < (Nx/4)**2
+    if Type == "rectangle":
+    	wall[Nx//3:2*Nx//3, Nx//3:2*Nx//3] = True
+	
 	
     global display
-    display.update(F, cylinder)
+    display.update(F, wall)
 
 
 def init():
@@ -65,17 +73,20 @@ def init():
     screen = pg.display.set_mode((Wi,He + b)) 
     
     Buttons = [GUI.Button(screen, 0,He, b*2,b, "reset"),
-			   GUI.Switch(screen, b*2.1*2,He, b*2,b, ["draw","select","del"]),
-			   GUI.Switch(screen, b*2.1,He, b*2,b, ["play","pause"])]
+			   GUI.Switch(screen, b*4.2,He, b*2,b, ["draw","select","del"]),
+			   GUI.Switch(screen, b*2.1,He, b*2,b, ["play","pause"]),
+			   GUI.Switch(screen, b*6.3,He, b*4,b, ["none","cylinder","rectangle"])]
     display = GUI.Display(screen, 0,0, Wi,He)
 	
     # MODEL init <--
+    global Type
+    Type = "cylinder"
     Field_init()
 	
     
 
 def step_calc():
-		global cylinder, F
+		global wall, F
 		global display
 		#print(it)
 
@@ -86,7 +97,7 @@ def step_calc():
 
 
 		# Set reflective boundaries
-		bndryF = F[cylinder,:]
+		bndryF = F[wall,:]
 		bndryF = bndryF[:,[-1,-2,-3,-4,-5,-6,-7,-8,0]]
 
 
@@ -105,26 +116,28 @@ def step_calc():
 		F += -(1.0/tau) * (F - Feq)
 
 		# Apply boundary
-		F[cylinder,:] = bndryF
+		F[wall,:] = bndryF
 
 
-		display.update(F, cylinder)
+		display.update(F, wall)
 			
 	
 def interract(press, pos):
-	global mode, Buttons, play
+	global mode, Buttons, play, Type
+	global wall
 	
 	x,y = pos[:2]
 	if 0 < x < Wi:
 		if 0 < y < He:
 			# работа с полем
 			print(pos)
-			if type == "draw":
+			if mode == "draw":
+				wall[x  * N//Wi,y * N//Wi] = True
+				print(True)
+			if mode == "select":
 				pass
-			if type == "select":
-				pass
-			elif type == "del":
-				pass
+			elif mode == "del":
+				wall[x  * N//Wi,y * N//Wi] = False
         
 		elif He < y < He + b:
 			for Bt in Buttons: # переключение кнопок
@@ -137,17 +150,45 @@ def interract(press, pos):
 		
 	# реакции кнопок
 	if Buttons[0].active:
-		Field_init()
+		Field_init(Type)
 		Buttons[0].active = 0
-	if Buttons[2].active:
-		if Buttons[2].state == 0:
-			play = 0
-		elif Buttons[2].state == 1:
-			play = 1
-		Buttons[2].active = 0
-		
-			
 	
+	if Buttons[1].active:
+		mode = Buttons[1].text[Buttons[1].state]
+		print(mode,Buttons[1].text[Buttons[1].state])
+		Buttons[1].active = 0
+	
+	if Buttons[2].active:
+		play = Buttons[2].state
+
+		Buttons[2].active = 0
+	
+	if Buttons[3].active:
+		Type = Buttons[3].text[Buttons[3].state]
+		print(mode,Buttons[3].text[Buttons[3].state])
+		Buttons[3].active = 0
+		
+def swipe(pos, prs):
+	if prs == (-1,-1):
+		return
+	
+	if not (0<prs[0]<Wi):
+		return
+	if not (0<prs[1]<He):
+		return
+
+	global wall
+	x,y = pos[:2]
+	if 0 < x < Wi:
+		if 0 < y < He:
+			# работа с полем
+			if mode == "draw":
+				wall[x  * N//Wi,y * N//Wi] = True
+				
+			if mode == "select":
+				pass
+			elif mode == "del":
+				wall[x  * N//Wi,y * N//Wi] = False 
 	
 	
 
@@ -169,6 +210,7 @@ def main():
 	
 	clock = pg.time.Clock()
 	RUN = True
+	prs = (-1,-1)
 	
 	while RUN:
 		if play:
@@ -184,12 +226,14 @@ def main():
 				
 			elif event.type == pg.MOUSEBUTTONDOWN:
 				interract(1, event.pos)
+				prs = event.pos
 				
 			elif event.type == pg.MOUSEBUTTONUP:
 				interract(0, event.pos)
+				prs = (-1,-1)
 			
 			elif event.type == pg.MOUSEMOTION:
-				pass
+				swipe(event.pos, prs)
 
 
 if __name__ == "__main__":
