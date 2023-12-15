@@ -26,19 +26,19 @@ class GUI_window:  # класс пустого окна
 class Display(GUI_window):  # класс экрана
     def __init__(self, screen, Px, Py, Sx, Sy, F=np.ones((1, 1, 9)), Walls=np.zeros((1, 1), dtype=np.bool_)):
         super().__init__(screen, Px, Py, Sx, Sy)
-        self.F = F  # поле жидкости
-        self.Walls = Walls
-        self.dat = np.ones((2, 1, 1))
+        self._F = F  # поле жидкости
+        self._Walls = Walls
+        self._dat = np.ones((2, 1, 1))
 
     def update(self, F, cylinder):
-        self.F = F
-        self.Walls = cylinder
+        self._F = F
+        self._Walls = cylinder
 
     def simple_draw(self):
         m = 2  # np.mean(np.sum(self.F[:,:,:3], 2))
         mm = 3  # np.min(np.sum(self.F[:,:,:3], 2))
         # W = self.F[:,:,:3] * 0 для доработки
-        K = 255*((m - np.sum(self.F[:, :, :3], 2))/(mm+1e-14))
+        K = 255*((m - np.sum(self._F[:, :, :3], 2))/(mm+1e-14))
 
         W = np.zeros((len(K), len(K[0]), 3))
         W[:, :, 2] = 50
@@ -46,20 +46,20 @@ class Display(GUI_window):  # класс экрана
         W[:, :, 1][K > 0] += K[K > 0]
         for i in range(3):
             W[W[:, :, i] > 255, i] = 255
-        W[self.Walls] = (0, 0, 0)
+        W[self._Walls] = (0, 0, 0)
         self._screen.blit(pygame.transform.scale(
             pygame.surfarray.make_surface(W), self.size), self.pos)
 
     def get(self, x, y):  # получение точки
 
-        return self.dat[0][x, y], self.dat[1][x, y]
+        return self._dat[0][x, y], self._dat[1][x, y]
 
     def draw(self):  # отрисовка
-        rho = np.sum(self.F, 2)
-        ux = np.sum(self.F*cxs, 2) / rho
-        uy = np.sum(self.F*cys, 2) / rho
-        ux[self.Walls] = 0
-        uy[self.Walls] = 0
+        rho = np.sum(self._F, 2)
+        ux = np.sum(self._F*cxs, 2) / rho
+        uy = np.sum(self._F*cys, 2) / rho
+        ux[self._Walls] = 0
+        uy[self._Walls] = 0
         vorticity = (np.roll(ux, -1, axis=0) - np.roll(ux, 1, axis=0)) - \
             (np.roll(uy, -1, axis=1) - np.roll(uy, 1, axis=1))  # карта кручения
 
@@ -72,12 +72,12 @@ class Display(GUI_window):  # класс экрана
         W[:, :, 2] = 50
         W[:, :, 0][K < 0] = -K[K < 0]
         W[:, :, 1][K > 0] = K[K > 0]
-        W[self.Walls] = (0, 0, 0)
+        W[self._Walls] = (0, 0, 0)
 
-        self.dat = [W, rho]
+        self._dat = [W, rho]
 
         self._screen.blit(pygame.transform.scale(
-            pygame.surfarray.make_surface(W), self.size), self.pos)
+            pygame.surfarray.make_surface(255**0.3*W**0.7//1), self.size), self.pos)
 
 
 class Button(GUI_window):  # кнопки

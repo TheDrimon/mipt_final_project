@@ -60,7 +60,7 @@ def init():
     global Buttons, display
 
     Wi, He = 1080, 360
-    N = 324  # Wi liquid resolition
+    N = 300  # 432  # Wi liquid resolition
     b = 30  # отступ меню
 
     pg.init()
@@ -200,10 +200,11 @@ def main():
     while RUN:
         if Buttons[2].state:
             step_calc()
+            step_calc()
 
         draw()
 
-        clock.tick(600)
+        clock.tick(60)
 
         for event in pg.event.get():  # события
             if event.type == pg.QUIT:
