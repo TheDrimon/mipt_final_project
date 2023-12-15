@@ -3,88 +3,90 @@ import numpy as np
 import GUI
 
 def Field_init(Type = "cylinder"):
-    global NL, idxs, cxs, cys, weights
-    global F
-    NL = 9
-    # маски для расчётов
-    idxs = np.arange(NL)
-    cxs = np.array([-1, 0, 1,
-				    -1, 0, 1,
-				    -1, 0, 1])
-    cys = np.array([1, 1, 1,
-				    0, 0, 0,
-				    -1,-1,-1])
-    weights = np.array([1/36, 1/9, 1/36,
-					    1/9,  4/9, 1/9,
-					    1/36, 1/9, 1/36])
-    
-    
-    Nx, Ny = N * He//Wi, N
+	global NL, idxs, cxs, cys, weights
+	global F
+	NL = 9
+	# маски для расчётов
+	idxs = np.arange(NL)
+	cxs = np.array([-1, 0, 1,
+					-1, 0, 1,
+					-1, 0, 1])
+	cys = np.array([1, 1, 1,
+					0, 0, 0,
+					-1,-1,-1])
+	weights = np.array([1/36, 1/9, 1/36,
+						1/9,  4/9, 1/9,
+						1/36, 1/9, 1/36])
+	
+	
+	Nx, Ny = N * He//Wi, N
 
-    # Начальные условия
-    global wall, rho0, tau
-	            
-    rho0 = 10 # average density
-    tau = 1 # collision timescale
+	# Начальные условия
+	global wall, rho0, tau
+				
+	rho0 = 10 # average density
+	tau = 1 # collision timescale
 	
-    F = np.ones((Ny,Nx,NL)) * rho0 / NL# поле жидкости
+	F = np.ones((Ny,Nx,NL)) * rho0 / NL# поле жидкости
 	
-    #np.random.seed(42)
+	#np.random.seed(42)
 	
-    F += 0.01*np.random.randn(Ny,Nx,NL)
+	F += 0.01*np.random.randn(Ny,Nx,NL)
 	
-    X, Y = np.meshgrid(range(Nx), range(Ny))
+	X, Y = np.meshgrid(range(Nx), range(Ny))
 	
-    F[:,:,1] += 2*(1+0.2*np.cos(2*np.pi*X/Nx*4))# создание потока
+	F[:,:,1] += 2 * (1 + .2 * np.cos(2*np.pi * X/Nx * 4))# создание потока
 	
-    rho = np.sum(F,2)
-    for i in idxs:
-        F[:,:,i] *= rho0 / rho
+	rho = np.sum(F,2)
+	for i in idxs:
+		F[:,:,i] *= rho0 / rho
 	
 
-    # wall boundary
-    wall = np.zeros((Ny,Nx), dtype = np.bool_)
-    if Type == "none":
-    	pass
-    if Type == "cylinder":
-    	wall = (X - Nx/2)**2 + (Y - Ny/4)**2 < (Nx/4)**2
-    if Type == "rectangle":
-    	wall[Nx // 3: 2 * Nx // 3, Nx // 3: 2 * Nx // 3] = True
+	# wall boundary
+	wall = np.zeros((Ny,Nx), dtype = np.bool_)
+	if Type == "none":
+		pass
+	if Type == "cylinder":
+		wall = (X - Nx/2)**2 + (Y - Ny/4)**2 < (Nx/4)**2
+	if Type == "rectangle":
+		wall[Nx // 3: 2 * Nx // 3, Nx // 3: 2 * Nx // 3] = True
 	
 	
-    global display
-    display.update(F, wall)
+	global display
+	display.update(F, wall)
 
 
 def init():
 	# GUI init <--
-    global N, screen, Wi, He, b
-    global mode, play
-    global Buttons, display
-    
-    play = 0# 0 | 1
-    mode = "draw"  # draw | select | del 
-    Wi, He = 1080,360
-    N = 324# Wi liquid resolition
-    b = 30 # отступ меню
-    
-    
-    pg.init()
-    
-    screen = pg.display.set_mode((Wi,He + b)) 
-    
-    Buttons = [GUI.Button(screen, 0,He, b*2,b, "reset"),
+	global N, screen, Wi, He, b
+	global mode, play
+	global Buttons, display
+	
+	play = 0# 0 | 1
+	mode = "draw"  # draw | select | del 
+	Wi, He = 1080,360
+	N = 324# Wi liquid resolition
+	b = 30 # отступ меню
+	
+	
+	pg.init()
+	
+	screen = pg.display.set_mode((Wi,He + b)) 
+	
+	Buttons = [GUI.Button(screen, 0,He, b*2,b, "reset"),
 			   GUI.Switch(screen, b*4.2,He, b*2,b, ["draw","select","del"]),
 			   GUI.Switch(screen, b*2.1,He, b*2,b, ["play","pause"]),
-			   GUI.Switch(screen, b*6.3,He, b*4,b, ["none","cylinder","rectangle"])]
-    display = GUI.Display(screen, 0,0, Wi,He)
+			   GUI.Switch(screen, b*6.3,He, b*4,b, ["none","cylinder","rectangle"]),
+			   GUI.Switch(screen, b*10.4,He, b*2,b, ["rot","rho"])]
+	display = GUI.Display(screen, 0,0, Wi,He)
 	
-    # MODEL init <--
-    global Type
-    Type = "cylinder"
-    Field_init()
+	# MODEL init <--
+	global Type, D_type
+	D_type = ""
+	Type = "cylinder"
+	Field_init()
 	
-    
+	
 
 def step_calc():
 		global wall, F
@@ -110,8 +112,8 @@ def step_calc():
 		# Apply Collision
 		Feq = np.zeros(F.shape)
 		for i, cx, cy, w in zip(idxs, cxs, cys, weights):
-			ss = (cx*ux+cy*uy)
-			Feq[:,:,i] = rho * w * ( 1 + 3*ss + 9*ss**2/2 - 3*(ux*ux+uy*uy)/2 )
+			ss = 3 * (cx*ux + cy*uy)
+			Feq[:,:,i] = rho * w * ( 1 + ss + ss*ss/2 - 3*(ux*ux + uy*uy)/2 )
 
 		F += -(1.0 / tau) * (F - Feq)
 
@@ -123,7 +125,7 @@ def step_calc():
 			
 	
 def interract(press, pos):
-	global mode, Buttons, play, Type
+	global mode, Buttons, play, Type, D_type
 	global wall
 	
 	x,y = pos[:2]# координаты косания
@@ -138,7 +140,7 @@ def interract(press, pos):
 				pass
 			elif mode == "del":
 				wall[x  * N//Wi, y * N//Wi] = False
-        
+		
 		elif He < y < He + b:
 			for Bt in Buttons: # переключение кнопок
 				if Bt.pos[0] < x < Bt.pos[0] + Bt.size[0]:
@@ -167,6 +169,10 @@ def interract(press, pos):
 		Type = Buttons[3].text[Buttons[3].state]
 		
 		Buttons[3].active = 0
+	if Buttons[4].active:
+		D_type = Buttons[4].text[Buttons[4].state]
+		
+		Buttons[4].active = 0
 		
 def swipe(pos, prs):
 	if prs == (-1,-1):
@@ -177,31 +183,42 @@ def swipe(pos, prs):
 	if not (0 < prs[1] < He):
 		return
 
-	global wall
+	global wall, display
 	x,y = pos[:2]
 	if 0 < x < Wi:
 		if 0 < y < He:
 			# работа с полем
+			pg.display.set_caption(str((x,y)))
 			if mode == "draw":
 				wall[x  * N//Wi, y * N//Wi] = True
 				
 			if mode == "select":
-				pass
+				G = display.get(x  * N//Wi, y * N//Wi)
+				pg.display.set_caption(str((x  * N//Wi, y * N//Wi))
+						   				+ " col = " + str(np.int16(G[0]))
+										+ " rho = " + str(G[1])          )
 			elif mode == "del":
-				wall[x  * N//Wi,y * N//Wi] = False 
+				wall[x  * N//Wi, y * N//Wi] = False
+			
+			
 	
 	
 
-    
+	
 
 def draw():
 	screen.fill((0,0,0))
 
-	display.draw()# отрисовка по скорости кручения
+	if D_type == "rho":
+		display.simple_draw()# отрисовка по плотности
+	else:
+		display.draw()# отрисовка по скорости кручения
 	
 	for i in Buttons:# интерфейс
 		i.draw()
-		
+	
+	
+
 	pg.display.update()
 
 
@@ -219,7 +236,7 @@ def main():
 		draw()
 
 		clock.tick(60)
-            
+			
 		for event in pg.event.get():# события
 			if event.type == pg.QUIT:
 				RUN = False
@@ -237,4 +254,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+	main()

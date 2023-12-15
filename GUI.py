@@ -35,7 +35,19 @@ class Display(GUI_window):# класс экрана
         self.Walls = cylinder
     
     def simple_draw(self):
-        self._screen.blit(pygame.transform.scale(pygame.surfarray.make_surface(self.F), self.size), self.pos)
+        m = 2 #np.mean(np.sum(self.F[:,:,:3], 2))
+        mm = 3 #np.min(np.sum(self.F[:,:,:3], 2))
+        #W = self.F[:,:,:3] * 0
+        K = 255*((m - np.sum(self.F[:,:,:3], 2))/(mm+1e-14))
+
+        W = np.zeros((len(K),len(K[0]),3))
+        W[:,:,2] = 50
+        W[:,:,0][K < 0] -= K[K < 0]
+        W[:,:,1][K > 0] += K[K > 0]
+        for i in range(3):
+            W[W[:,:,i]> 255,i] = 255
+        W[self.Walls] = (0,0,0)
+        self._screen.blit(pygame.transform.scale(pygame.surfarray.make_surface(W), self.size), self.pos)
     
     def get(self, x,y):# получение точки
         rho = np.sum(self.F, 2)
