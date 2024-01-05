@@ -1,16 +1,19 @@
 import pygame
 import numpy as np
+import torch
+device = torch.device("cuda")
 
 color = [(200, 200, 200),
          (180, 180, 240)]  # базовые цвета кнопок
 
 # карты течений
-cxs = np.array([-1, 0, 1,
-                -1, 0, 1,
-                -1, 0, 1])
-cys = np.array([1, 1, 1,
-                0, 0, 0,
-                -1, -1, -1])
+cxs = torch.ByteTensor([-1, 0, 1,
+                        -1, 0, 1,
+                        -1, 0, 1]).cuda()
+cys = torch.ByteTensor([1, 1, 1,
+                        0, 0, 0,
+                        -1, -1, -1]).cuda()
+OOO = torch.zeros(3).cuda()
 
 
 class GUI_window:  # класс пустого окна
@@ -24,11 +27,11 @@ class GUI_window:  # класс пустого окна
 
 
 class Display(GUI_window):  # класс экрана
-    def __init__(self, screen, Px, Py, Sx, Sy, F=np.ones((1, 1, 9)), Walls=np.zeros((1, 1), dtype=np.bool_)):
+    def __init__(self, screen, Px, Py, Sx, Sy, F=np.ones((1, 1, 9)), Walls=torch.zeros((1, 1), dtype=torch.bool)):
         super().__init__(screen, Px, Py, Sx, Sy)
         self._F = F  # поле жидкости
         self._Walls = Walls
-        self._dat = np.ones((2, 1, 1))
+        self._dat = torch.ones((2, 1, 1))
 
     def update(self, F, cylinder):
         self._F = F
@@ -38,46 +41,47 @@ class Display(GUI_window):  # класс экрана
         m = 2  # np.mean(np.sum(self.F[:,:,:3], 2))
         mm = 3  # np.min(np.sum(self.F[:,:,:3], 2))
         # W = self.F[:,:,:3] * 0 для доработки
-        K = 255*((m - np.sum(self._F[:, :, :3], 2))/(mm+1e-14))
+        K = 255*((m - torch.sum(self._F[:, :, :3], 2))/(mm+1e-14))
 
-        W = np.zeros((len(K), len(K[0]), 3))
+        W = torch.zeros((len(K), len(K[0]), 3)).cuda()
         W[:, :, 2] = 50
         W[:, :, 0][K < 0] -= K[K < 0]
         W[:, :, 1][K > 0] += K[K > 0]
-        for i in range(3):
-            W[W[:, :, i] > 255, i] = 255
-        W[self._Walls] = (0, 0, 0)
+
+        W[W > 255] = 255
+        # for i in range(3):
+        #    W[W[:, :, i] > 255, i] = 255
+        W[self._Walls] = OOO
         self._screen.blit(pygame.transform.scale(
-            pygame.surfarray.make_surface(W), self.size), self.pos)
+            pygame.surfarray.make_surface(np.array(W.cpu())), self.size), self.pos)
 
     def get(self, x, y):  # получение точки
 
         return self._dat[0][x, y], self._dat[1][x, y]
 
     def draw(self):  # отрисовка
-        rho = np.sum(self._F, 2)
-        ux = np.sum(self._F*cxs, 2) / rho
-        uy = np.sum(self._F*cys, 2) / rho
-        ux[self._Walls] = 0
-        uy[self._Walls] = 0
-        vorticity = (np.roll(ux, -1, axis=0) - np.roll(ux, 1, axis=0)) - \
-            (np.roll(uy, -1, axis=1) - np.roll(uy, 1, axis=1))  # карта кручения
+        rho = torch.sum(self._F, 2).cuda()
+        ux = torch.sum(self._F*cxs, 2) / rho
+        uy = torch.sum(self._F*cys, 2) / rho
 
-        m = np.mean(vorticity)
-        mm = np.min(vorticity)
+        vorticity = (torch.roll(ux, -1, 0) - torch.roll(ux, 1, 0)) - \
+            (torch.roll(uy, -1, 1) - torch.roll(uy, 1, 1))  # карта кручения
+
+        m = torch.mean(vorticity)
+        mm = torch.min(vorticity)
 
         K = 255 * ((m - vorticity) / (mm + 1e-14))
 
-        W = np.zeros((len(K), len(K[0]), 3))
+        W = torch.zeros((len(K), len(K[0]), 3)).cuda()
         W[:, :, 2] = 50
         W[:, :, 0][K < 0] = -K[K < 0]
         W[:, :, 1][K > 0] = K[K > 0]
-        W[self._Walls] = (0, 0, 0)
+        W[self._Walls] = OOO
 
         self._dat = [W, rho]
 
         self._screen.blit(pygame.transform.scale(
-            pygame.surfarray.make_surface(255**0.3*W**0.7//1), self.size), self.pos)
+            pygame.surfarray.make_surface(np.array((255**0.3*W**0.7//1).cpu())), self.size), self.pos)
 
 
 class Button(GUI_window):  # кнопки

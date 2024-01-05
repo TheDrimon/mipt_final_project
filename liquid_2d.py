@@ -1,20 +1,25 @@
+from timeit import default_timer as timer
+import GUI
 import pygame as pg
 import numpy as np
-import GUI
+import torch
+device = torch.device("cuda")
 
 
 def field_init(w_type="cylinder"):
-    global NL, idxs, cxs, cys, weights
+    global NL, idxs, cxs, cys, Cxs, Cys, weights
     global F
     NL = 9
     # маски для расчётов
     idxs = np.arange(NL)
-    cxs = np.array([-1, 0, 1,
-                    -1, 0, 1,
-                    -1, 0, 1])
-    cys = np.array([1, 1, 1,
-                    0, 0, 0,
-                    -1, -1, -1])
+    cxs = torch.asarray([-1, 0, 1,
+                         -1, 0, 1,
+                         -1, 0, 1], dtype=torch.int8).cuda()
+    cys = torch.asarray([1, 1, 1,
+                         0, 0, 0,
+                         -1, -1, -1], dtype=torch.int8).cuda()
+    Cxs = np.byte(cxs.cpu())
+    Cys = np.byte(cys.cpu())
     weights = np.array([1/36, 1/9, 1/36,
                         1/9,  4/9, 1/9,
                         1/36, 1/9, 1/36])
@@ -22,27 +27,29 @@ def field_init(w_type="cylinder"):
     Nx, Ny = N * He//Wi, N
 
     # Начальные условия
-    global wall, rho0, tau
+    global wall, rho0, tau, OO
 
     rho0 = 10  # average density
-    tau = 0.6  # collision timescale
+    tau = 0.65  # collision timescale
 
-    F = np.ones((Ny, Nx, NL)) * rho0 / NL  # поле жидкости
+    F = (torch.ones((Ny, Nx, NL), dtype=torch.float32)
+         * rho0 / NL).cuda()  # поле жидкости
 
-    # np.random.seed(42)
+    OO = torch.zeros(F.shape, dtype=torch.float32).cuda()
 
-    F += 0.01*np.random.randn(Ny, Nx, NL)
+    F += 0.01*torch.randn(Ny, Nx, NL).cuda()
 
-    X, Y = np.meshgrid(range(Nx), range(Ny))
+    Y, X = torch.meshgrid(torch.range(0, Ny-1), torch.range(0, Nx-1))
 
-    F[:, :, 1] += 2 * (1 + .2 * np.cos(2*np.pi * X/Nx * 4))  # создание потока
+    # создание потока
+    F[:, :, 1] += (2 + .4 * torch.cos(torch.pi * X.cuda()/Nx * 8))
 
-    rho = np.sum(F, 2)
+    rho = torch.sum(F, 2).cuda()
     for i in idxs:
         F[:, :, i] *= rho0 / rho
 
     # wall boundary
-    wall = np.zeros((Ny, Nx), dtype=np.bool_)
+    wall = torch.zeros((Ny, Nx), dtype=torch.bool).cuda()
     if w_type == "none":
         pass
     if w_type == "cylinder":
@@ -59,8 +66,8 @@ def init():
     global N, screen, Wi, He, b
     global Buttons, display
 
-    Wi, He = 1080, 360
-    N = 300  # 432  # Wi liquid resolition
+    Wi, He = 1400, 400
+    N = 1400  # 864  # 432  # Wi liquid resolition
     b = 30  # отступ меню
 
     pg.init()
@@ -86,33 +93,31 @@ def init():
 def step_calc():
     global wall, F
     global display
+    global Feq
 
     # Drift
-    for i, cx, cy in zip(idxs, cxs, cys):
-        F[:, :, i] = np.roll(F[:, :, i], cx, axis=1)
-        F[:, :, i] = np.roll(F[:, :, i], cy, axis=0)
-
-    # Set reflective boundaries
-    bndryF = F[wall, :]
-    bndryF = bndryF[:, [-1, -2, -3, -4, -5, -6, -7, -8, 0]]
+    for i, cx, cy in zip(idxs, Cxs, Cys):
+        F[:, :, i] = torch.roll(F[:, :, i], cx, 1)
+        F[:, :, i] = torch.roll(F[:, :, i], cy, 0)
 
     # Calculate fluid variables
-    rho = np.sum(F, 2)
-    ux = np.sum(F*cxs, 2) / rho
-    uy = np.sum(F*cys, 2) / rho
+    rho = torch.sum(F, 2).cuda()
+    ux = torch.sum(F*cxs, 2) / rho
+    uy = torch.sum(F*cys, 2) / rho
 
     # Apply Collision
-    Feq = np.zeros(F.shape)
-    for i, cx, cy, w in zip(idxs, cxs, cys, weights):
+    Feq = OO
+    for i, cx, cy, w in zip(idxs, Cxs, Cys, weights):
         ss = 3 * (cx*ux + cy*uy)
-        Feq[:, :, i] = rho * w * (1 + ss + ss*ss/2 - 3*(ux*ux + uy*uy)/2)
 
-    F += -(1.0 / tau) * (F - Feq)
+        Feq[:, :, i] = rho * w * (1 + ss + ss*ss/2 - 1.5*(ux*ux + uy*uy))
+
+    F -= (1.0 / tau) * (F - Feq)
 
     # Apply boundary
-    F[wall, :] = bndryF
+    F[wall, :] = F[wall, :][:, [-1, -2, -3, -4, -5, -6, -7, -8, 0]]
 
-    display.update(F, wall)
+    # display.update(F, wall)
 
 
 def interract(press, pos):
@@ -128,7 +133,10 @@ def interract(press, pos):
                 wall[x * N//Wi, y * N//Wi] = True
 
             if mode == "select":
-                pass
+                G = display.get(x * N//Wi, y * N//Wi)
+                pg.display.set_caption(str((x * N//Wi, y * N//Wi))
+                                       + " col = " + str(np.int16(G[0].cpu()))
+                                       + " rho = " + str(G[1].cpu()))
             elif mode == "del":
                 wall[x * N//Wi, y * N//Wi] = False
 
@@ -170,8 +178,8 @@ def swipe(pos, prs):
             if mode == "select":
                 G = display.get(x * N//Wi, y * N//Wi)
                 pg.display.set_caption(str((x * N//Wi, y * N//Wi))
-                                       + " col = " + str(np.int16(G[0]))
-                                       + " rho = " + str(G[1]))
+                                       + " col = " + str(np.int16(G[0].cpu()))
+                                       + " rho = " + str(G[1].cpu()))
             elif mode == "del":
                 wall[x * N//Wi, y * N//Wi] = False
 
@@ -199,12 +207,15 @@ def main():
 
     while RUN:
         if Buttons[2].state:
-            step_calc()
-            step_calc()
+            start = timer()
+            for i in range(4):
+                step_calc()
+            print(str((timer() - start) * 1000)[:2], "мс")
 
+        display.update(F, wall)
         draw()
 
-        clock.tick(60)
+        # clock.tick(600)
 
         for event in pg.event.get():  # события
             if event.type == pg.QUIT:
